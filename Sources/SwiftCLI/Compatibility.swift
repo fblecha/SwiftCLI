@@ -9,35 +9,23 @@ import Foundation
 
 // MARK: Minor version deprecations
 
-@available(*, deprecated, renamed: "run(_:arguments:)")
-public func run(_ executable: String, _ args: [String]) throws {
-    try run(executable, arguments: args)
-}
+@available(*, unavailable, renamed: "Task.run")
+public func run(_ executable: String, _ arguments: String...) throws {}
 
-@available(*, deprecated, message: "Use run(_:arguments:directory:) instead")
-public func run(_ executable: String, directory: String, _ args: String...) throws {
-    try run(executable, arguments: args, directory: directory)
-}
+@available(*, unavailable, renamed: "Task.run")
+public func run(_ executable: String, arguments: [String], directory: String? = nil) throws {}
 
-@available(*, deprecated, message: "Use run(_:arguments:directory:) instead")
-public func run(_ executable: String, directory: String, _ args: [String]) throws {
-    try run(executable, arguments: args, directory: directory)
-}
+@available(*, unavailable, renamed: "Task.capture")
+public func capture(_ executable: String, _ arguments: String...) throws -> CaptureResult { fatalError() }
 
-@available(*, deprecated, renamed: "capture(_:arguments:)")
-public func capture(_ executable: String, _ args: [String]) throws -> CaptureResult {
-    return try capture(executable, arguments: args)
-}
+@available(*, unavailable, renamed: "Task.capture")
+public func capture(_ executable: String, arguments: [String], directory: String? = nil) throws -> CaptureResult { fatalError() }
 
-@available(*, deprecated, message: "Use capture(_:arguments:directory:) instead")
-public func capture(_ executable: String, directory: String, _ args: String...) throws -> CaptureResult {
-    return try capture(executable, arguments: args, directory: directory)
-}
+@available(*, unavailable, renamed: "Task.run")
+public func run(bash: String, directory: String? = nil) throws {}
 
-@available(*, deprecated, message: "Use capture(_:arguments:directory:) instead")
-public func capture(_ executable: String, directory: String?, _ args: [String]) throws -> CaptureResult {
-    return try capture(executable, arguments: args, directory: directory)
-}
+@available(*, unavailable, renamed: "Task.capture")
+public func capture(bash: String, directory: String? = nil) throws -> CaptureResult { fatalError() }
 
 extension Task {
     
@@ -56,9 +44,21 @@ extension Task {
         self.init(executable: executable, arguments: args, directory: currentDirectory, stdout: stdout, stderr: stderr, stdin: stdin)
     }
     
+    /// Finds the path to an executable
+    ///
+    /// - Parameter named: the name of the executable to find
+    /// - Returns: the full path to the executable if found, or nil
+    @available(*, deprecated)
+    public static func findExecutable(named: String) -> String? {
+        if named.hasPrefix("/") || named.hasPrefix(".") {
+            return named
+        }
+        return try? capture(bash: "which \(named)").stdout
+    }
+    
 }
 
-public extension Input {
+extension Input {
     
     @available(*, unavailable, message: "Use Validation<String>.custom instead of (String) -> Bool")
     public static func readLine(prompt: String? = nil, secure: Bool = false, validation: ((String) -> Bool)? = nil, errorResponse: InputReader<String>.ErrorResponse? = nil) -> String {
@@ -81,15 +81,43 @@ public extension Input {
     }
     
     @available(*, unavailable, message: "Use Validation<T>.custom instead of (T) -> Bool")
-    public static func readObject<T>(prompt: String? = nil, secure: Bool = false, validation: ((T) -> Bool)? = nil, errorResponse: InputReader<T>.ErrorResponse? = nil) -> T {
-        return T.convert(from: "")!
+    public static func readObject<T: ConvertibleFromString>(prompt: String? = nil, secure: Bool = false, validation: ((T) -> Bool)? = nil, errorResponse: InputReader<T>.ErrorResponse? = nil) -> T {
+        fatalError()
     }
     
 }
 
-public extension InputReader {
+extension InputReader {
     @available(*, deprecated, message: "Use Validation<T>.custom instead of InputReader<T>.Validation")
     public typealias Validation = (T) -> Bool
+}
+
+extension CLI {
+    
+    @available(*, unavailable, message: "Use go(with:)")
+    public func debugGo(with argumentString: String) -> Int32 {
+        return 1
+    }
+    
+}
+
+@available(*, deprecated, renamed: "ShellCompletion")
+public typealias Completion = ShellCompletion
+
+extension CaptureResult {
+    
+    /// The full stdout contents; use `stdout` for trimmed contents
+    @available(*, deprecated, message: "Use stdout or stdoutData")
+    public var rawStdout: String {
+        return String(data: stdoutData, encoding: .utf8) ?? ""
+    }
+    
+    /// The full stderr contents; use `stderr` for trimmed contents
+    @available(*, deprecated, message: "Use stderr or stderrData")
+    public var rawStderr: String {
+        return String(data: stderrData, encoding: .utf8) ?? ""
+    }
+    
 }
 
 // MARK: - Swift versions
@@ -104,16 +132,20 @@ extension Sequence {
 
 #endif
 
-// MARK: - Linux support
+#if !swift(>=5.0)
 
-#if os(Linux)
-#if swift(>=3.1)
-typealias Regex = NSRegularExpression
-#else
-typealias Regex = RegularExpression
-#endif
-#else
-typealias Regex = NSRegularExpression
+extension Collection {
+    func firstIndex(where test: (Element) -> Bool) -> Index? {
+        return index(where: test)
+    }
+}
+
+extension Collection where Element: Equatable {
+    func firstIndex(of element: Element) -> Index? {
+        return index(of: element)
+    }
+}
+
 #endif
 
 // MARK: Unavailable
@@ -155,26 +187,6 @@ extension CLI {
     
     @available(*, unavailable, message: "Create a new CLI object: let cli = CLI(..)")
     public static func debugGo(with argumentString: String) -> Int32 { return 0 }
-    
-    @available(*, unavailable, message: "Use a custom parser instead: cli.parser = Parser(router: MyRouter())")
-    public var router: Router {
-        get {
-            return parser.router
-        }
-        set(newValue) {
-            parser = Parser(router: newValue)
-        }
-    }
-    
-    @available(*, unavailable, message: "Use a custom parser instead: cli.parser = Parser(parameterFiller: ParameterFiller())")
-    public var parameterFiller: ParameterFiller {
-        get {
-            return parser.parameterFiller
-        }
-        set(newValue) {
-            parser = Parser(parameterFiller: newValue)
-        }
-    }
     
 }
 
@@ -220,14 +232,6 @@ extension WritableStream {
     @available(*, unavailable, renamed: "print")
     public func output(_ content: String, terminator: String) {}
     
-}
-
-extension Term {
-    @available(*, unavailable, message: "Use WriteStream.stdout instead")
-    public static var stdout: WritableStream { return WriteStream.stdout }
-    
-    @available(*, unavailable, message: "Use WriteStream.stderr instead")
-    public static var stderr: WritableStream { return WriteStream.stderr }
 }
 
 @available(*, unavailable, message: "use CLI.Error instead")

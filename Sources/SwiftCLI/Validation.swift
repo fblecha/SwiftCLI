@@ -5,7 +5,11 @@
 //  Created by Jake Heiser on 11/21/18.
 //
 
-public struct Validation<T> {
+public protocol AnyValidation {
+    var message: String { get }
+}
+
+public struct Validation<T>: AnyValidation {
     
     public enum Result {
         case success
@@ -19,23 +23,23 @@ public struct Validation<T> {
     }
     
     public let block: ValidatorBlock
-    private let message: String
+    public let message: String
     
     init(_ message: String, _ block: @escaping ValidatorBlock) {
         self.block = block
         self.message = message
     }
     
-    public func validate(_ value: T) -> Result {
+    public func validate(_ value: T) -> Bool {
         guard block(value) else {
-            return .failure(message)
+            return false
         }
-        return .success
+        return true
     }
     
 }
 
-public extension Validation where T: Equatable {
+extension Validation where T: Equatable {
     
     public static func allowing(_ values: T..., message: String? = nil) -> Validation {
         let commaSeparated = values.map({ String(describing: $0) }).joined(separator: ", ")
@@ -49,7 +53,7 @@ public extension Validation where T: Equatable {
     
 }
 
-public extension Validation where T: Comparable {
+extension Validation where T: Comparable {
     
     public static func greaterThan(_ value: T, message: String? = nil) -> Validation {
         return .init(message ?? "must be greater than \(value)") { $0 > value }
@@ -69,7 +73,7 @@ public extension Validation where T: Comparable {
     
 }
 
-public extension Validation where T == String {
+extension Validation where T == String {
     
     public static func contains(_ substring: String, message: String? = nil) -> Validation {
         return .init(message ?? "must contain '\(substring)'") { $0.contains(substring) }

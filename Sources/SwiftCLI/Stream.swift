@@ -30,7 +30,8 @@ extension WritableStream {
     /// - Parameter content: the content to write
     public func write(_ content: String) {
         guard let data = content.data(using: encoding) else {
-            fatalError("Couldn't write content: \(content)")
+            assertionFailure("Couldn't write content: \(content)")
+            return
         }
         writeData(data)
     }
@@ -210,7 +211,8 @@ extension ReadableStream {
             return unread.isEmpty ? nil : unread
         }
         guard let new = String(data: data, encoding: encoding) else {
-            fatalError("Couldn't parse data into string using \(encoding)")
+            assertionFailure("Couldn't parse data into string using \(encoding)")
+            return nil
         }
         return unread + new
     }
@@ -232,7 +234,7 @@ extension ReadableStream {
             }
         }
         
-        if let index = accumluated.index(of: delimiter) {
+        if let index = accumluated.firstIndex(of: delimiter) {
             let remainder = String(accumluated[accumluated.index(after: index)...])
             readBuffer.fill(with: remainder)
             return String(accumluated[..<index])
@@ -447,7 +449,7 @@ public class CaptureStream: ProcessingStream {
     public let writeHandle: FileHandle
     public var encoding: String.Encoding = .utf8
     
-    private var content = ""
+    private var content = Data()
     private let queue = DispatchQueue(label: "com.jakeheis.SwiftCLI.CaptureStream")
     private let semaphore = DispatchSemaphore(value: 0)
     private var waited = false
@@ -460,7 +462,7 @@ public class CaptureStream: ProcessingStream {
         
         let readStream = ReadStream.for(fileHandle: pipe.fileHandleForReading)
         queue.async { [weak self] in
-            while let chunk = readStream.read() {
+            while let chunk = readStream.readData() {
                 self?.content += chunk
             }
             self?.semaphore.signal()
@@ -473,14 +475,21 @@ public class CaptureStream: ProcessingStream {
         semaphore.wait()
     }
     
-    /// Read all the data written to this stream; blocks until all output has been captured
+    /// Read all the data written to this stream as Data; blocks until all output has been captured
     ///
     /// - Returns: all captured data
-    public func readAll() -> String {
+    public func readAllData() -> Data {
         if !waited {
             waitToFinishProcessing()
         }
         return content
+    }
+    
+    /// Read all the data written to this stream as a String; blocks until all output has been captured
+    ///
+    /// - Returns: all captured data
+    public func readAll() -> String {
+        return String(data: readAllData(), encoding: encoding) ?? ""
     }
     
 }
